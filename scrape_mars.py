@@ -40,29 +40,15 @@ def scrape():
     #url_images = "https://www.jpl.nasa.gov/spaceimages/?search=&category=featured#submit"
     url_images = 'https://www.jpl.nasa.gov/spaceimages/?search=&category=Mars'
     browser.visit(url_images)
-    
-    #get the base url
-    #from urllib.parse import urlsplit
-    #base_url = "{0.scheme}://{0.netloc}/".format(urlsplit(url_images))
-    #print(base_url)
-
-    #Design an xpath selector to grab the images
-    #xpath = "//*[@id=\"page\"]/section[3]/div/ul/li[1]/a/div/div[2]/img"
-    #use splinter to bring images
-    #results = browser.find_by_xpath(xpath)
-    #img = results[0]
-    #img.click()
-    
-    #get image url using BeautifulSoup
-    
+    browser.find_link_by_partial_text("FULL IMAGE").click()
+    time.sleep(10)
+    browser.find_link_by_partial_text("more info").click()
+    time.sleep(5)
     html_image = browser.html
-    soup2 = bs(html_image, 'html.parser')
-    img_url=  soup2.find_all('a',class_="fancybox")
-    #img_url = soup.find("img", class_="fancybox-image")["src"]
-    #featured_image_url = base_url + img_url
-
-    #print(featured_image_url)
-    mars_data["Featured_Image_Url"] = "https://www.jpl.nasa.gov/" + img_url[1].text
+    soup = bs(html_image, 'html.parser')
+    img_url=  soup.find('img',class_="main_image")["src"]
+    
+    mars_data["Featured_Image_Url"] = "https://www.jpl.nasa.gov/" + img_url
     
     
     #Mars Weather from twitter
@@ -73,56 +59,43 @@ def scrape():
     html_weather = browser.html
     soup = bs(html_weather, "html.parser")
 
-    for mars_weather in soup.find_all('p',class_="TweetTextSize TweetTextSize--normal js-tweet-text tweet-text"):
-        weather_info_dict.append(mars_weather.text)
-    
-    #print('Latest Mars Weather: ' +  weather_info_dict[8])
-    #mars_data["Latest_Mars_Weather"] = weather_info_dict[8]
-    print('Latest Mars Weather: ' +  weather_info_dict[7])
-    #mars_data["Latest_Mars_Weather"] = weather_info_dict[8]
+    time.sleep(3)
+    tweets = soup.find_all("div",class_='js-tweet-text-container')
+    mars_weather=""
+    for tweet in tweets:
+        if tweet.p.get_text().startswith("Sol "):
+            mars_weather = tweet.p.get_text()
+            break
+ 
+    mars_data["Latest_Mars_Weather"] = mars_weather
     
     #Mars Facts
     url_facts = "https://space-facts.com/mars/"
     fact_df = pd.read_html(url_facts)
+    
     mars_fact_df = fact_df[0]
+    mars_fact_df.columns =["Description","Value"]
     #print(mars_fact_df)
-    mars_fact_table = mars_fact_df.to_html()
-    mars_fact_table = mars_fact_table.replace("\n","")
+    mars_fact_table = mars_fact_df.to_html(na_rep = " ",classes="table table-sm table-striped", justify="left",col_space=0)
+   #mars_fact_table = mars_fact_table.replace("\n","")
     print(mars_fact_table)
     mars_data["Mars_Facts"] = mars_fact_table
     
     #collection of title and images for Mars hemispheres
-    hemisphere_image_urls = {}
+    #collection of title and images for Mars hemispheres
+    hemisphere_image_urls = []
     
-   # base_url = "https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars"
-   # browser.visit(base_url)
-   # time.sleep(3)
-   # usgs_html = browser.html
-
-   # usgs_html_soup = bs(usgs_html, "html.parser")
-   # results = usgs_html_soup.find_all("h3")
-
-    # Use splinter to parse title and image urls
-   # for result in results:
-   #     title = result.text
-   #     browser.click_link_by_partial_text(title)
-   #     time.sleep(1)
-   #     image_url = browser.find_link_by_partial_href("download")["href"]
-   #     hemisphere_dict = {"title": title, "image_url": image_url}
-   #     hemisphere_image_urls.append(hemisphere_dict)
-   #     time.sleep(1)
-  #      browser.visit(image_url)
-
     hemisphere_names = ['cerberus%20enhanced', 'schiaparelli%20enhanced','syrtis%20major%20enhanced','valles%20marineris%20enhanced']
     for hemis in hemisphere_names:
         base ='https://astrogeology.usgs.gov/search/map/Mars/Viking/' + hemis
         browser.visit(base)
         html_hm = browser.html
         soup3 = bs(html_hm,'html.parser')
-        print(base)
-        hemisphere_image_urls["image_url"] = soup3.find('img',class_='wide-image')['src']
-        hemisphere_image_urls["title"] = soup3.find('h2',class_='title').text
-    print(hemisphere_image_urls)
+        #hemisphere_image_urls["image_url"] = soup3.find('img',class_='wide-image')['src']
+        imagelist = soup3.find('div',class_="wide-image-wrapper").find_all('li')
+        img_url = "https://astropedia.astrogeology.usgs.gov/download/Mars/Viking/"+ hemis.replace("%20","_") + ".tif/full.jpg"
+        hemisphere_image_urls.append({"hems_title" : soup3.find('h2',class_='title').text,"image_url": img_url} )
+
     mars_data["Mars_Hemisphere_urls"] = hemisphere_image_urls
     browser.quit()
 
